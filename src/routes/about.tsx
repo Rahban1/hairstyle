@@ -14,31 +14,31 @@ function About() {
         </p>
       </header>
       
-      <div className="w-full fade-in flex flex-col gap-12">
-        <section className="clinical-border clinical-bg p-8 md:p-12">
-          <h2 className="text-2xl mb-6 font-serif">1. Facial Thirds</h2>
-          <p className="text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
+      <div className="w-full fade-in flex flex-col gap-8 md:gap-12">
+        <section className="clinical-border clinical-bg p-6 md:p-12">
+          <h2 className="text-xl md:text-2xl mb-4 md:mb-6 font-serif">1. Facial Thirds</h2>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
             The proportions of your upper, middle, and lower thirds dictate perceived attractiveness more than any other proportional feature. Exposing a compact third or covering a wider third corrects visual imbalances.
           </p>
         </section>
 
-        <section className="clinical-border clinical-bg p-8 md:p-12">
-          <h2 className="text-2xl mb-6 font-serif">2. Symmetrical Variance</h2>
-          <p className="text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
+        <section className="clinical-border clinical-bg p-6 md:p-12">
+          <h2 className="text-xl md:text-2xl mb-4 md:mb-6 font-serif">2. Symmetrical Variance</h2>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
             Highly balanced faces can pull off symmetrical styles, while asymmetrical faces benefit from messy, textured, irregular volume to diffuse focus and prevent the eye from locking onto structural unevenness.
           </p>
         </section>
 
-        <section className="clinical-border clinical-bg p-8 md:p-12">
-          <h2 className="text-2xl mb-6 font-serif">3. Vertical Orientation</h2>
-          <p className="text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
+        <section className="clinical-border clinical-bg p-6 md:p-12">
+          <h2 className="text-xl md:text-2xl mb-4 md:mb-6 font-serif">3. Vertical Orientation</h2>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
             Long faces require horizontal emphasis (flat, side-swept), while short/compressed faces require vertical emphasis (volume on top) to create mathematical proportion.
           </p>
         </section>
 
-        <section className="clinical-border clinical-bg p-8 md:p-12">
-          <h2 className="text-2xl mb-6 font-serif">4. Jaw Projection</h2>
-          <p className="text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
+        <section className="clinical-border clinical-bg p-6 md:p-12">
+          <h2 className="text-xl md:text-2xl mb-4 md:mb-6 font-serif">4. Jaw Projection</h2>
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed font-sans max-w-3xl">
             Angular, prominent jaws are beautifully highlighted by short buzz cuts, while softer jaws are better complemented by textured length.
           </p>
         </section>

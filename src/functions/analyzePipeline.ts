@@ -9,7 +9,7 @@ import {
 import { buildPrimaryHairstylePlan, buildRecommendedStyles } from "./styleReferences"
 import { selectClosestGeneratedImageAspectRatio } from "../utils/imageAspectRatio"
 
-const REPLICATE_IMAGE_MODEL = "openai/gpt-image-1.5"
+const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro"
 
 const FACE_ANALYSIS_JSON_SCHEMA = {
   type: "object",

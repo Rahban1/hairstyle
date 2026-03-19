@@ -1,99 +1,69 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { startTransition, useRef, useState } from 'react'
+import { useState, useRef } from 'react'
 import { analyzeFaceFn } from '../functions/analyzeFace'
-import type { AnalysisResult } from '../domain/faceAnalysis'
-import {
-  Upload,
-  Crosshair,
-  RefreshCcw,
-  CheckCircle2,
-  ImageIcon,
-  ArrowUpRight,
-} from 'lucide-react'
-import { prepareUploadedImage } from '../utils/prepareUploadedImage'
+import { createRazorpayOrderFn } from '../functions/razorpay'
+import { Upload, Activity, Crosshair, RefreshCcw, CheckCircle2, Lock, Loader2, Maximize2, X, Download } from 'lucide-react'
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+}
 
 export const Route = createFileRoute('/')({ component: Home })
 
-function getSimulationStatus(result: AnalysisResult) {
-  if (result.generatedImageError) {
-    return {
-      title: 'Simulation unavailable',
-      description: result.generatedImageError,
-      note: 'The recommended look preview now uses Replicate OpenAI GPT Image 1.5 with your uploaded portrait as a reference. If generation fails, check the Replicate token and billing behind REPLICATE_API_TOKEN.',
-    }
-  }
-
-  return {
-    title: 'Simulation pending',
-    description: 'Your hairstyle render will appear here once generation completes.',
-    note: null,
-  }
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message
-  }
-
-  if (typeof error === 'string' && error.trim()) {
-    return error
-  }
-
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'message' in error &&
-    typeof error.message === 'string' &&
-    error.message.trim()
-  ) {
-    return error.message
-  }
-
-  return 'Analysis could not be completed. Upload a clear, front-facing portrait and try again.'
-}
-
 function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [imageFrameAspectRatio, setImageFrameAspectRatio] = useState<number | null>(null)
+  const [base64Image, setBase64Image] = useState<string | null>(null)
+  
+  // Payment State
+  const [isCheckout, setIsCheckout] = useState(false)
+  const [isInitializingPayment, setIsInitializingPayment] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState<number>(8900) 
+  const [paymentCurrency, setPaymentCurrency] = useState<string>('INR')
+  
+  // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [result, setResult] = useState<AnalysisResult | null>(null)
+  const [result, setResult] = useState<any>(null)
+  
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const simulationStatus = result ? getSimulationStatus(result) : null
-  const previewFrameStyle = imageFrameAspectRatio
-    ? { aspectRatio: imageFrameAspectRatio }
-    : undefined
 
   const handleFile = async (file: File) => {
-    setErrorMessage(null)
-    setIsAnalyzing(true)
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const base64String = reader.result as string
+      setImagePreview(base64String)
+      setBase64Image(base64String)
+      setResult(null) 
+      setPaymentError(null)
+      setIsCheckout(true)
+      setIsInitializingPayment(true)
 
-    try {
-      const preparedImage = await prepareUploadedImage(file)
-
-      startTransition(() => {
-        setImagePreview(preparedImage.previewUrl)
-        setImageFrameAspectRatio(preparedImage.width / preparedImage.height)
-        setResult(null)
-      })
-
-      const data = await analyzeFaceFn({
-        data: {
-          base64Image: preparedImage.base64Image,
-          sourceWidth: preparedImage.width,
-          sourceHeight: preparedImage.height,
-        },
-      })
-
-      setResult(data)
-    } catch (err) {
-      console.error('Analysis failed:', err)
-      setResult(null)
-      setErrorMessage(getErrorMessage(err))
-    } finally {
-      setIsAnalyzing(false)
+      try {
+        const data = await createRazorpayOrderFn()
+        if (data.orderId) {
+          setOrderId(data.orderId)
+          setPaymentAmount(data.amount)
+          setPaymentCurrency(data.currency)
+        } else {
+          setPaymentError("Gateway failed to generate an Order ID.")
+        }
+      } catch (err: any) {
+        console.error("Failed to initialize payment:", err)
+        setPaymentError(err?.message || "Payment gateway unavailable. Please contact support.")
+      } finally {
+        setIsInitializingPayment(false)
+      }
     }
+    reader.readAsDataURL(file)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,6 +90,99 @@ function Home() {
     setIsDragging(false)
   }
 
+  const displayRazorpay = async () => {
+    const res = await loadRazorpayScript()
+
+    if (!res) {
+      alert('Razorpay SDK failed to load. Are you online?')
+      return
+    }
+
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID, 
+      amount: paymentAmount.toString(),
+      currency: paymentCurrency,
+      name: 'Optimal Hair AI',
+      description: 'Objective Facial Assessment - $1 (₹89)',
+      image: 'https://cdn-icons-png.flaticon.com/512/10041/10041432.png',
+      order_id: orderId,
+      handler: function (response: any) {
+        // Only trigger analysis upon successful completion of payment
+        triggerAnalysis(response)
+      },
+      prefill: {
+        name: 'Guest User',
+        email: 'guest@example.com',
+      },
+      notes: {
+        address: 'Optimal Hair AI HQ',
+      },
+      theme: {
+        color: '#111111', 
+      },
+    }
+
+    const paymentObject = new (window as any).Razorpay(options)
+    paymentObject.on('payment.failed', function (response: any) {
+      alert(`Payment failed: ${response.error.description}`)
+    })
+    paymentObject.open()
+  }
+
+  const triggerAnalysis = async (paymentResponse: any) => {
+    if (!base64Image) return
+    setIsCheckout(false)
+    setIsAnalyzing(true)
+    
+    try {
+      // Send the image ALONG WITH the cryptographically signed payment token
+      const data = await analyzeFaceFn({ 
+        data: { 
+          base64Image,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_signature: paymentResponse.razorpay_signature
+        } 
+      })
+      setResult(data)
+    } catch (err: any) {
+      console.error("Analysis or Payment Verification failed:", err)
+      alert(err.message || "Payment Verification Failed. Unauthorized Request.")
+      resetAssessment()
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const resetAssessment = () => {
+    setImagePreview(null)
+    setBase64Image(null)
+    setResult(null)
+    setIsCheckout(false)
+    setOrderId(null)
+    setPaymentError(null)
+    setIsFullscreen(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleDownload = async (url: string) => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = `optimal-hair-ai-${Date.now()}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error("Download failed, opening in new tab instead", err)
+      window.open(url, '_blank')
+    }
+  }
+
   return (
     <main className="page-wrap px-4 py-16 md:py-24 min-h-screen max-w-5xl mx-auto flex flex-col items-center selection:bg-[var(--text-main)] selection:text-[var(--bg-base)]">
       
@@ -144,333 +207,307 @@ function Home() {
         tabIndex={-1}
       />
 
-      {/* UPLOAD STATE - Enhanced A11y & Drag/Drop */}
+      {/* UPLOAD STATE */}
       {!imagePreview && (
-        <div className="w-full max-w-2xl fade-in">
-          <button 
-            type="button"
-            disabled={isAnalyzing}
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            aria-label="Upload portrait for facial analysis"
-            className={`w-full border p-16 md:p-24 text-center transition-all duration-300 ease-out cursor-pointer group disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--bg-base)] ${
-              isDragging 
-                ? 'border-solid border-[var(--text-main)] bg-[var(--surface)] scale-[1.02]' 
-                : 'border-dashed border-[var(--border-color)] clinical-bg hover:border-[var(--text-main)] hover:shadow-sm'
-            }`}
-          >
-            <div className="flex flex-col items-center justify-center gap-5">
-              <div className="p-4 rounded-full bg-[var(--bg-base)] border border-[var(--border-color)] group-hover:scale-110 transition-transform duration-300 ease-out shadow-sm">
-                <Upload size={24} strokeWidth={1.5} className="text-[var(--text-main)]" />
-              </div>
-              <div>
-                <span className="label-caps block mb-2 text-[var(--text-main)] group-hover:text-black dark:group-hover:text-white transition-colors">
-                  {isAnalyzing
-                    ? 'Preparing Portrait'
-                    : isDragging
-                      ? 'Drop Image Here'
-                      : 'Submit Portrait'}
-                </span>
-                <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">
-                  {isAnalyzing
-                    ? 'Normalizing the upload and starting analysis.'
-                    : 'Drag and drop, or click to browse. Ensure the face is clearly visible with neutral lighting.'}
-                </p>
-              </div>
+        <button 
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          aria-label="Upload portrait for facial analysis"
+          className={`w-full max-w-2xl border p-10 sm:p-16 md:p-24 text-center transition-all duration-300 ease-out cursor-pointer group fade-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--bg-base)] ${
+            isDragging 
+              ? 'border-solid border-[var(--text-main)] bg-[var(--surface)] scale-[1.02]' 
+              : 'border-dashed border-[var(--border-color)] clinical-bg hover:border-[var(--text-main)] hover:shadow-sm'
+          }`}
+        >
+          <div className="flex flex-col items-center justify-center gap-5">
+            <div className="p-4 rounded-full bg-[var(--bg-base)] border border-[var(--border-color)] group-hover:scale-110 transition-transform duration-300 ease-out shadow-sm">
+              <Upload size={24} strokeWidth={1.5} className="text-[var(--text-main)]" />
             </div>
-          </button>
-
-          {errorMessage && (
-            <div
-              role="alert"
-              className="mt-4 border border-[var(--border-color)] bg-[var(--surface)] px-5 py-4 text-left text-sm text-[var(--text-muted)]"
-            >
-              {errorMessage}
+            <div>
+              <span className="label-caps block mb-2 text-[var(--text-main)] group-hover:text-black dark:group-hover:text-white transition-colors">
+                {isDragging ? 'Drop Image Here' : 'Submit Portrait'}
+              </span>
+              <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">
+                Drag and drop, or click to browse. Ensure the face is clearly visible with neutral lighting.
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        </button>
       )}
 
       {/* ANALYSIS STATE */}
       {imagePreview && (
-        <div className="w-full fade-in flex flex-col gap-8 mt-4">
-          <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8 items-stretch">
-            <article className="clinical-border bg-[var(--bg-base)] overflow-hidden">
-              <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center justify-between gap-3">
-                <span className="label-caps text-[var(--text-main)]">Current Photo</span>
-                <span className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">
-                  Source
-                </span>
+        <div className="w-full fade-in grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start mt-4">
+          
+          {/* LEFT: IMAGE SUBJECT */}
+          <div className="flex flex-col gap-4 sm:gap-6 lg:sticky lg:top-24">
+            <div className="w-full clinical-border p-2 bg-[var(--surface)] relative group">
+              <div className="relative overflow-hidden w-full bg-black/5 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
+                <img 
+                  src={imagePreview} 
+                  alt="Portrait subject awaiting analysis" 
+                  className={`w-full max-h-[50vh] lg:max-h-[70vh] object-contain grayscale-[20%] contrast-125 transition-transform duration-700 ease-out ${isCheckout ? 'blur-sm scale-105' : ''}`}
+                />
+                
+                {/* CHECKOUT OVERLAY (BLUR) */}
+                {isCheckout && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center text-white z-10 transition-all duration-500 ease-in-out">
+                    <Lock size={48} strokeWidth={1} className="opacity-70" />
+                  </div>
+                )}
+
+                {/* SCANNING OVERLAY */}
+                {isAnalyzing && (
+                  <div className="absolute inset-0 bg-[var(--bg-base)]/80 backdrop-blur-sm flex flex-col items-center justify-center border border-[var(--border-color)] m-2 z-10 transition-all duration-500 ease-in-out">
+                    <Activity className="animate-pulse mb-6 text-[var(--text-main)]" size={32} strokeWidth={1.5} />
+                    <span className="label-caps tracking-[0.2em] text-[var(--text-main)] animate-pulse">
+                      Analyzing Proportions
+                    </span>
+                    <div className="mt-8 w-48 h-px bg-[var(--border-color)] overflow-hidden relative">
+                      <div className="absolute top-0 left-0 h-full bg-[var(--text-main)] w-1/3 animate-[pulse_1.5s_ease-in-out_infinite]" />
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="p-3 md:p-4 bg-[var(--surface)]/30">
-                <div className="relative w-full overflow-hidden bg-black/5" style={previewFrameStyle}>
-                  <img
-                    src={imagePreview}
-                    alt="Current uploaded portrait"
-                    className="block h-full w-full object-contain grayscale-[12%] contrast-110 transition-transform duration-700 ease-out"
-                  />
-                  {isAnalyzing && (
-                    <div className="absolute left-4 bottom-4 border border-[var(--border-color)] bg-[var(--bg-base)]/90 px-3 py-2 text-[10px] uppercase tracking-[0.24em] text-[var(--text-main)] backdrop-blur-sm">
-                      Analyzing structure
+            </div>
+
+            <button 
+              type="button"
+              disabled={isAnalyzing}
+              onClick={resetAssessment}
+              className="group flex items-center justify-center gap-3 label-caps text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all duration-300 text-center w-full py-4 clinical-border clinical-bg hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+            >
+              <RefreshCcw size={14} className="group-hover:-rotate-90 transition-transform duration-500" strokeWidth={1.5} />
+              Reset Assessment
+            </button>
+          </div>
+
+          {/* RIGHT: DATA & RESULTS */}
+          <div className="flex flex-col h-full w-full gap-6 md:gap-8 mt-2 lg:mt-0">
+            
+            {/* CHECKOUT STATE */}
+            {isCheckout && (
+              <div className="fade-in flex flex-col items-center justify-center clinical-border bg-[var(--surface)]/50 p-6 sm:p-8 min-h-[300px] md:min-h-[400px] h-full">
+                <div className="w-full max-w-sm flex flex-col gap-6">
+                  <header className="text-center border-b border-[var(--border-color)] pb-6 mb-4">
+                    <Lock size={28} strokeWidth={1} className="mx-auto mb-4 text-[var(--text-main)]" />
+                    <h2 className="text-2xl font-serif text-[var(--text-main)] mb-2">Unlock Assessment</h2>
+                    <p className="text-sm text-[var(--text-muted)]">A ₹89 INR charge (≈$1.00 USD) is required to initialize the computational algorithms.</p>
+                  </header>
+
+                  {isInitializingPayment && (
+                    <div className="py-12 flex flex-col items-center justify-center gap-4">
+                      <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
+                      <span className="label-caps opacity-60">Connecting to Gateway...</span>
+                    </div>
+                  )}
+
+                  {!isInitializingPayment && paymentError && (
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-4 border border-[var(--error)] bg-[var(--error)]/10 text-[var(--error)] text-xs rounded-none text-center leading-relaxed font-medium">
+                        <p className="font-bold uppercase tracking-wider mb-2 text-[10px]">Payment System Offline</p>
+                        <p>{paymentError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isInitializingPayment && !paymentError && orderId && (
+                    <div className="fade-in">
+                      <button 
+                        onClick={displayRazorpay}
+                        className="w-full clinical-button bg-[var(--text-main)] text-[var(--bg-base)] py-4 hover:opacity-80 transition-opacity flex items-center justify-center gap-3"
+                      >
+                        <Lock size={16} strokeWidth={1.5} />
+                        Pay with Razorpay (₹89)
+                      </button>
+                      <p className="text-center text-[10px] text-[var(--text-muted)] uppercase tracking-widest mt-4">
+                        100% Secure Checkout. Supports UPI, Cards, NetBanking.
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
-            </article>
+            )}
 
-            <article className="clinical-border bg-[var(--bg-base)] overflow-hidden">
-              <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center justify-between gap-3">
-                <span className="label-caps text-[var(--text-main)]">Recommended Look</span>
-                <span className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)] text-right">
-                  {result?.recommendation ?? 'AI preview'}
-                </span>
-              </div>
-              <div className="p-3 md:p-4 bg-[var(--surface)]/30">
-                {result?.generatedImageUrl ? (
-                  <div className="relative w-full overflow-hidden bg-black/5" style={previewFrameStyle}>
-                    <img
-                      src={result.generatedImageUrl}
-                      alt={`AI generated preview of ${result.recommendation}`}
-                      className="block h-full w-full object-contain transition-transform duration-700 ease-out"
-                    />
-                    <div className="absolute left-4 top-4 border border-[var(--border-color)] bg-[var(--bg-base)]/92 px-3 py-2 text-[10px] uppercase tracking-[0.22em] text-[var(--text-main)] backdrop-blur-sm">
-                      {result.recommendation}
+            {/* ANALYZING STATE */}
+            {isAnalyzing && (
+              <div className="h-full min-h-[400px] clinical-border p-8 flex flex-col gap-10 justify-center bg-[var(--surface)]/30">
+                {[
+                  'Extracting facial thirds', 
+                  'Mapping symmetrical variance', 
+                  'Measuring vertical orientation', 
+                  'Calculating jaw projection',
+                  'Cryptographic payment verified'
+                ].map((step, idx) => (
+                  <div key={idx} className="w-full relative">
+                    <div className="flex justify-between items-end mb-3">
+                      <span className="text-xs uppercase tracking-wider text-[var(--text-main)] font-medium opacity-80">{step}</span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-mono animate-pulse">
+                        {idx === 4 ? "Verified" : "Processing"}
+                      </span>
+                    </div>
+                    <div className="h-px w-full bg-[var(--border-color)] overflow-hidden relative">
+                       <div 
+                         className="absolute top-0 left-0 h-full bg-[var(--text-main)] transition-all duration-[2000ms] ease-out" 
+                         style={{ 
+                           width: idx === 4 ? '100%' : '100%', 
+                           transformOrigin: 'left',
+                           animation: idx === 4 ? 'none' : `scaleX 2s ease-out infinite alternate`,
+                           animationDelay: `${idx * 0.2}s`
+                         }}
+                       />
                     </div>
                   </div>
-                ) : isAnalyzing ? (
-                  <div
-                    className="clinical-border p-8 flex flex-col justify-center gap-8 bg-[var(--surface)]/60"
-                    style={previewFrameStyle}
-                  >
-                    <div>
-                      <span className="label-caps text-[var(--text-main)]">Building your best hairstyle</span>
-                      <p className="mt-3 text-sm text-[var(--text-muted)] leading-relaxed">
-                        One hairstyle is being selected first, then the AI preview is generated from that single recommendation.
-                      </p>
-                    </div>
-                    {[
-                      'Choosing the best haircut shape',
-                      'Setting the front and side balance',
-                      'Preparing the AI hairstyle preview',
-                    ].map((step, idx) => (
-                      <div key={step} className="w-full">
-                        <div className="flex justify-between items-end mb-3">
-                          <span className="text-xs uppercase tracking-wider text-[var(--text-main)] opacity-80">{step}</span>
-                          <span className="text-[10px] text-[var(--text-muted)] font-mono animate-pulse">Working</span>
-                        </div>
-                        <div className="h-px w-full bg-[var(--border-color)] overflow-hidden relative">
-                          <div
-                            className="absolute top-0 left-0 h-full bg-[var(--text-main)] transition-all duration-[2000ms] ease-out"
-                            style={{
-                              width: '100%',
-                              transformOrigin: 'left',
-                              animation: 'scaleX 2s ease-out infinite alternate',
-                              animationDelay: `${idx * 0.2}s`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="min-h-[420px] clinical-border bg-[var(--surface)]/60 flex flex-col items-center justify-center gap-4 px-8 text-center">
-                    <div className="p-3 rounded-full bg-[var(--bg-base)] border border-[var(--border-color)]">
-                      <Crosshair size={22} strokeWidth={1.5} className="text-[var(--text-muted)] opacity-60" />
-                    </div>
-                    <p className="text-[10px] md:text-xs uppercase tracking-widest text-[var(--text-muted)] max-w-xs leading-relaxed">
-                      {simulationStatus?.title ?? 'Waiting for recommendation'}
-                    </p>
-                    <p className="max-w-md text-sm md:text-base text-[var(--text-main)] leading-relaxed">
-                      {simulationStatus?.description ?? 'Your AI hairstyle preview will show up here after the recommendation is ready.'}
-                    </p>
-                    {simulationStatus?.note && (
-                      <p className="max-w-md text-xs text-[var(--text-muted)] leading-relaxed">
-                        {simulationStatus.note}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </article>
-          </section>
-
-          {errorMessage && !isAnalyzing && (
-            <div
-              role="alert"
-              className="clinical-border bg-[var(--surface)] px-6 py-5 text-sm text-[var(--text-muted)]"
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <section className="clinical-border bg-[var(--bg-base)] overflow-hidden">
-            <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center gap-3">
-              <CheckCircle2 size={16} strokeWidth={1.5} className="text-[var(--text-main)]" />
-              <span className="label-caps text-[var(--text-main)]">Aesthetic Protocol</span>
-            </div>
-
-            {result && !isAnalyzing ? (
-              <div className="p-8 md:p-10 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)] mb-4">
-                    Best hairstyle for you
-                  </p>
-                  <h2 className="text-3xl lg:text-4xl leading-tight font-serif text-[var(--text-main)]">
-                    {result.recommendation}
-                  </h2>
-                  <p className="mt-5 text-sm md:text-base text-[var(--text-muted)] leading-relaxed max-w-2xl">
-                    {result.explanation}
-                  </p>
-                </div>
-
-                <div className="clinical-border bg-[var(--surface)]/55 p-6 md:p-7">
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)] mb-5">
-                    Tell your barber
-                  </p>
-                  <ul className="space-y-4 text-sm md:text-[15px] text-[var(--text-main)] leading-relaxed">
-                    {result.protocolSteps.map((step) => (
-                      <li key={step} className="flex items-start gap-3">
-                        <span className="mt-1 block h-1.5 w-1.5 rounded-full bg-[var(--text-main)]" />
-                        <span>{step}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : isAnalyzing ? (
-              <div className="p-8 md:p-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
-                <div className="space-y-4">
-                  <div className="h-3 w-32 bg-[var(--border-color)]/70 animate-pulse" />
-                  <div className="h-10 w-full max-w-xl bg-[var(--border-color)]/60 animate-pulse" />
-                  <div className="h-5 w-full max-w-2xl bg-[var(--border-color)]/50 animate-pulse" />
-                  <div className="h-5 w-full max-w-xl bg-[var(--border-color)]/50 animate-pulse" />
-                </div>
-                <div className="clinical-border bg-[var(--surface)]/55 p-6 md:p-7 space-y-4">
-                  {Array.from({ length: 4 }).map((_, idx) => (
-                    <div key={idx} className="h-4 w-full bg-[var(--border-color)]/55 animate-pulse" />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-[var(--text-muted)] bg-[var(--surface)]/20">
-                Upload a portrait to get one clear hairstyle recommendation and a matching AI preview.
+                ))}
               </div>
             )}
-          </section>
 
-          <section className="clinical-border bg-[var(--bg-base)] overflow-hidden">
-            <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center gap-3">
-              <ImageIcon size={16} strokeWidth={1.5} className="text-[var(--text-main)]" />
-              <span className="label-caps text-[var(--text-main)]">Reference Images</span>
-            </div>
-
-            {result && !isAnalyzing ? (
-              <div className="p-8 md:p-10">
-                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                  <div className="max-w-2xl">
-                    <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)] mb-4">
-                      Celebrity reference cuts
-                    </p>
-                    <h2 className="text-3xl lg:text-4xl leading-tight font-serif text-[var(--text-main)]">
+            {/* RESULT STATE */}
+            {result && !isAnalyzing && !isCheckout && (
+              <div className="fade-in flex flex-col gap-8">
+                {/* Protocol section */}
+                <section className="clinical-border bg-[var(--bg-base)] overflow-hidden group">
+                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center gap-3">
+                    <CheckCircle2 size={16} strokeWidth={1.5} className="text-[var(--text-main)]" />
+                    <span className="label-caps text-[var(--text-main)]">Aesthetic Protocol</span>
+                  </div>
+                  <div className="p-6 md:p-8 lg:p-10 transition-colors duration-500 hover:bg-[var(--surface)]/50">
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl mb-4 sm:mb-5 leading-snug font-serif text-[var(--text-main)]">
                       {result.recommendation}
                     </h2>
-                    <p className="mt-5 text-sm md:text-base text-[var(--text-muted)] leading-relaxed">
-                      Real-world examples with a similar silhouette, front direction, and overall finish so you can compare the target haircut before heading to the barber.
+                    <p className="text-sm md:text-base text-[var(--text-muted)] leading-relaxed">
+                      {result.explanation}
                     </p>
                   </div>
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)] md:text-right">
-                    Tap any reference to open the source
-                  </p>
-                </div>
+                </section>
 
-                <div className="mt-8 grid gap-5 md:grid-cols-3">
-                  {result.referenceExamples.map((example, index) => (
-                    <a
-                      key={`${result.recommendation}-${example.name}`}
-                      href={example.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group clinical-border overflow-hidden bg-[var(--surface)]/45 transition-all duration-300 hover:-translate-y-1 hover:border-[var(--text-main)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
-                    >
-                      <div className="relative aspect-[4/5] overflow-hidden bg-black/5">
-                        <img
-                          src={example.imageUrl}
-                          alt={`${example.name} wearing a hairstyle reference similar to ${result.recommendation}`}
-                          loading="lazy"
-                          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                {/* Metrics Table */}
+                <section className="clinical-border bg-[var(--bg-base)]">
+                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg">
+                    <span className="label-caps">Geometric Markers</span>
+                  </div>
+                  <div className="px-4 sm:px-6 md:px-8 py-2">
+                    <div className="metric-row group">
+                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Upper Third</span>
+                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
+                        {result.analysis.upperThird.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="metric-row group">
+                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Symmetry</span>
+                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
+                        {result.analysis.symmetry}
+                      </span>
+                    </div>
+                    <div className="metric-row group">
+                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Vertical Axis</span>
+                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
+                        {result.analysis.verticalLength}
+                      </span>
+                    </div>
+                    <div className="metric-row group border-b-0">
+                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Jaw Structure</span>
+                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
+                        {result.analysis.jawProjection.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Simulated Output */}
+                <section className="clinical-border flex flex-col bg-[var(--bg-base)]">
+                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex justify-between items-center">
+                    <span className="label-caps">Simulated Outcome</span>
+                    {result.generatedImageUrl && (
+                      <span className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                        Generated
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-6 md:p-8 text-center bg-[var(--surface)]/30">
+                    {result.generatedImageUrl ? (
+                      <div 
+                        onClick={() => setIsFullscreen(true)}
+                        className="overflow-hidden clinical-border bg-[var(--surface)] relative group cursor-pointer"
+                      >
+                        <img 
+                          src={result.generatedImageUrl} 
+                          alt="AI simulated outcome" 
+                          className="w-full h-auto grayscale-[10%] group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-700 ease-out"
                         />
-                        <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
-                          <span className="border border-white/40 bg-black/45 px-2.5 py-1 text-[10px] uppercase tracking-[0.24em] text-white backdrop-blur-sm">
-                            Ref {String(index + 1).padStart(2, '0')}
-                          </span>
-                          <span className="border border-white/20 bg-black/35 p-2 text-white backdrop-blur-sm transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-                            <ArrowUpRight size={14} strokeWidth={1.5} />
-                          </span>
-                        </div>
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                        <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-                          <p className="text-lg font-medium tracking-[0.01em]">{example.name}</p>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-500 ease-out flex items-center justify-center">
+                          <div className="opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out flex items-center gap-2 bg-white text-black px-4 py-2 rounded-sm text-xs uppercase tracking-widest font-semibold">
+                            <Maximize2 size={14} /> View Protocol
+                          </div>
                         </div>
                       </div>
-
-                      <div className="border-t border-[var(--border-color)] px-4 py-4">
-                        <p className="text-sm text-[var(--text-main)] leading-relaxed">
-                          {example.description}
+                    ) : (
+                      <div className="py-12 flex flex-col items-center gap-4">
+                        <div className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border-color)]">
+                          <Crosshair size={20} strokeWidth={1.5} className="text-[var(--text-muted)] opacity-60" />
+                        </div>
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed">
+                          Premium diffusion rendering requires active API connection. Add your configuration to generate the final simulation.
                         </p>
                       </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : isAnalyzing ? (
-              <div className="p-8 md:p-10">
-                <div className="space-y-4 max-w-2xl">
-                  <div className="h-3 w-40 bg-[var(--border-color)]/70 animate-pulse" />
-                  <div className="h-10 w-full max-w-lg bg-[var(--border-color)]/60 animate-pulse" />
-                  <div className="h-5 w-full max-w-2xl bg-[var(--border-color)]/50 animate-pulse" />
-                </div>
-                <div className="mt-8 grid gap-5 md:grid-cols-3">
-                  {Array.from({ length: 3 }).map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="clinical-border overflow-hidden bg-[var(--surface)]/45"
-                    >
-                      <div className="aspect-[4/5] bg-[var(--border-color)]/55 animate-pulse" />
-                      <div className="space-y-3 border-t border-[var(--border-color)] px-4 py-4">
-                        <div className="h-4 w-32 bg-[var(--border-color)]/60 animate-pulse" />
-                        <div className="h-4 w-full bg-[var(--border-color)]/50 animate-pulse" />
-                        <div className="h-4 w-5/6 bg-[var(--border-color)]/50 animate-pulse" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-[var(--text-muted)] bg-[var(--surface)]/20">
-                Upload a portrait to get a hairstyle recommendation, celebrity haircut references, and a matching AI preview.
+                    )}
+                  </div>
+                </section>
+
               </div>
             )}
-          </section>
-
-          <button
-            type="button"
-            disabled={isAnalyzing}
-            onClick={() => {
-              setImagePreview(null)
-              setImageFrameAspectRatio(null)
-              setResult(null)
-              setErrorMessage(null)
-              if (fileInputRef.current) fileInputRef.current.value = ''
-            }}
-            className="group flex items-center justify-center gap-3 label-caps text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all duration-300 text-center w-full py-4 clinical-border clinical-bg hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
-          >
-            <RefreshCcw size={14} className="group-hover:-rotate-90 transition-transform duration-500" strokeWidth={1.5} />
-            Reset Assessment
-          </button>
+          </div>
         </div>
       )}
+
+      {/* FULLSCREEN IMAGE MODAL */}
+      {isFullscreen && result?.generatedImageUrl && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 fade-in cursor-default"
+          onClick={() => setIsFullscreen(false)}
+        >
+          {/* Top Actions */}
+          <div className="absolute top-0 right-0 w-full p-6 flex justify-end gap-4 z-50">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownload(result.generatedImageUrl)
+              }}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-sm transition-colors text-xs uppercase tracking-widest font-medium border border-white/20"
+            >
+              <Download size={16} /> Save Image
+            </button>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsFullscreen(false)
+              }}
+              className="flex items-center justify-center bg-white/10 hover:bg-white/20 text-white w-10 h-10 rounded-sm transition-colors border border-white/20"
+              aria-label="Close Fullscreen"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Expanded Image */}
+          <div className="relative max-w-5xl max-h-[85vh] w-full flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={result.generatedImageUrl} 
+              alt="Expanded Simulated Outcome" 
+              className="w-auto h-auto max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm ring-1 ring-white/10"
+            />
+          </div>
+          
+          <p className="absolute bottom-8 text-white/50 text-xs uppercase tracking-[0.2em] font-medium animate-pulse">
+            Optimal Hair Protocol Generated
+          </p>
+        </div>
+      )}
+
     </main>
   )
 }
