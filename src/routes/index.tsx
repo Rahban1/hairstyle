@@ -31,6 +31,7 @@ function Home() {
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [lastPaymentResponse, setLastPaymentResponse] = useState<any>(null)
   
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -133,6 +134,7 @@ function Home() {
     if (!base64Image) return
     setIsCheckout(false)
     setIsAnalyzing(true)
+    setLastPaymentResponse(paymentResponse)
     
     try {
       // Send the image ALONG WITH the cryptographically signed payment token
@@ -149,6 +151,28 @@ function Home() {
       console.error("Analysis or Payment Verification failed:", err)
       alert(err.message || "Payment Verification Failed. Unauthorized Request.")
       resetAssessment()
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const retryAnalysis = async () => {
+    if (!lastPaymentResponse) return
+    setIsAnalyzing(true)
+    
+    try {
+      const data = await analyzeFaceFn({ 
+        data: { 
+          base64Image,
+          razorpay_payment_id: lastPaymentResponse.razorpay_payment_id,
+          razorpay_order_id: lastPaymentResponse.razorpay_order_id,
+          razorpay_signature: lastPaymentResponse.razorpay_signature
+        } 
+      })
+      setResult(data)
+    } catch (err: any) {
+      console.error("Retry failed:", err)
+      alert(err.message || "Analysis failed. Please try again from the beginning.")
     } finally {
       setIsAnalyzing(false)
     }
@@ -444,6 +468,23 @@ function Home() {
                             <Maximize2 size={14} /> View Protocol
                           </div>
                         </div>
+                      </div>
+                    ) : result.generatedImageError ? (
+                      <div className="py-12 flex flex-col items-center gap-4">
+                        <div className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border-color)]">
+                          <Crosshair size={20} strokeWidth={1.5} className="text-[var(--text-muted)] opacity-60" />
+                        </div>
+                        <p className="text-[10px] md:text-xs uppercase tracking-widest text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed">
+                          {result.generatedImageError}
+                        </p>
+                        <button 
+                          onClick={retryAnalysis}
+                          disabled={isAnalyzing}
+                          className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--text-main)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
+                        >
+                          <RefreshCcw size={12} className={isAnalyzing ? 'animate-spin' : ''} />
+                          {isAnalyzing ? 'Retrying...' : 'Try Again'}
+                        </button>
                       </div>
                     ) : (
                       <div className="py-12 flex flex-col items-center gap-4">
