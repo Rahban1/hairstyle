@@ -8,6 +8,7 @@ import {
 } from "./fireworks"
 import { buildPrimaryHairstylePlan, buildRecommendedStyles } from "./styleReferences"
 import { selectClosestGeneratedImageAspectRatio } from "../utils/imageAspectRatio"
+import { withAIApiRetry } from "../utils/retry"
 
 const REPLICATE_IMAGE_MODEL = "google/nano-banana-pro"
 
@@ -52,7 +53,8 @@ const performVisionAnalysis = (base64Image: string): Effect.Effect<FaceAnalysis,
       ? base64Image
       : `data:image/jpeg;base64,${base64Image}`
 
-    const response = await fetch(FIREWORKS_INFERENCE_API_URL, {
+    // Retry wrapper for transient API failures
+    const response = await withAIApiRetry(() => fetch(FIREWORKS_INFERENCE_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -99,7 +101,7 @@ Use only the supplied schema values and return valid JSON.`,
           },
         ],
       }),
-    })
+    }))
 
     if (!response.ok) {
       const errorBody = await response.text()
@@ -213,18 +215,20 @@ const generateTransformedImage = (
     )
 
     const output = await Promise.race([
-      replicate.run(
-        REPLICATE_IMAGE_MODEL,
-        {
-          input: {
-            prompt,
-            input_images: [inputImage],
-            input_fidelity: "high",
-            number_of_images: 1,
-            aspect_ratio: aspectRatio,
-            output_format: "webp",
+      withAIApiRetry(() =>
+        replicate.run(
+          REPLICATE_IMAGE_MODEL,
+          {
+            input: {
+              prompt,
+              input_images: [inputImage],
+              input_fidelity: "high",
+              number_of_images: 1,
+              aspect_ratio: aspectRatio,
+              output_format: "webp",
+            },
           },
-        },
+        )
       ),
       timeoutPromise,
     ])
