@@ -206,19 +206,28 @@ const generateTransformedImage = (
       sourceImageDimensions?.height,
     )
 
-    const output = await replicate.run(
-      REPLICATE_IMAGE_MODEL,
-      {
-        input: {
-          prompt,
-          input_images: [inputImage],
-          input_fidelity: "high",
-          number_of_images: 1,
-          aspect_ratio: aspectRatio,
-          output_format: "webp",
-        },
-      },
+    // Timeout wrapper to prevent hanging requests (60 second limit)
+    const TIMEOUT_MS = 60000
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Image generation timed out after 60 seconds')), TIMEOUT_MS)
     )
+
+    const output = await Promise.race([
+      replicate.run(
+        REPLICATE_IMAGE_MODEL,
+        {
+          input: {
+            prompt,
+            input_images: [inputImage],
+            input_fidelity: "high",
+            number_of_images: 1,
+            aspect_ratio: aspectRatio,
+            output_format: "webp",
+          },
+        },
+      ),
+      timeoutPromise,
+    ])
 
     const generatedImageUrl = extractReplicateOutputUrl(output)
 
