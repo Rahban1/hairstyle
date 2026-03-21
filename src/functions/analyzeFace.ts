@@ -3,6 +3,21 @@ import { Effect } from 'effect'
 import crypto from 'crypto'
 import { analyzePhotoPipeline } from './analyzePipeline'
 import { paymentStore } from '../utils/paymentStore'
+import { strictRateLimiter } from '../utils/rateLimiter'
+
+function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  const realIp = request.headers.get('x-real-ip')
+  if (realIp) {
+    return realIp
+  }
+  // Fallback to a hash of user agent + timestamp if no IP available
+  const ua = request.headers.get('user-agent') || 'unknown'
+  return `anon-${Buffer.from(ua).toString('base64').slice(0, 16)}`
+}
 
 export const analyzeFaceFn = createServerFn({ method: 'POST' })
   .inputValidator((data: { 
@@ -19,7 +34,17 @@ export const analyzeFaceFn = createServerFn({ method: 'POST' })
     }
     return data
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, request }) => {
+    // Rate limiting: 5 requests per hour per IP
+    const clientIp = getClientIp(request)
+    const rateLimit = strictRateLimiter.check(clientIp)
+    
+    if (!rateLimit.allowed) {
+      const minutesLeft = Math.ceil((rateLimit.resetTime - Date.now()) / 60000)
+      console.error("Rate limit exceeded", { clientIp, resetInMinutes: minutesLeft })
+      throw new Error(`Too many requests. Please try again in ${minutesLeft} minutes.`)
+    }
+
     const secret = process.env.RAZORPAY_KEY_SECRET
     if (!secret) {
       throw new Error("Server configuration error: missing payment secret")
