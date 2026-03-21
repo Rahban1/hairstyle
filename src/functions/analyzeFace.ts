@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { Effect } from 'effect'
 import crypto from 'crypto'
 import { analyzePhotoPipeline } from './analyzePipeline'
+import { paymentStore } from '../utils/paymentStore'
 
 export const analyzeFaceFn = createServerFn({ method: 'POST' })
   .inputValidator((data: { 
@@ -37,6 +38,15 @@ export const analyzeFaceFn = createServerFn({ method: 'POST' })
       console.error("Signature Mismatch!", { expectedSignature, received: data.razorpay_signature })
       throw new Error("Invalid payment signature. Unauthorized request.")
     }
+
+    // Check for replay attack: prevent same payment from being used multiple times
+    if (paymentStore.has(data.razorpay_payment_id)) {
+      console.error("Payment replay attempt detected", { paymentId: data.razorpay_payment_id })
+      throw new Error("Payment has already been used for analysis.")
+    }
+
+    // Record this payment as used
+    paymentStore.record(data.razorpay_payment_id, data.razorpay_order_id)
 
     // Run our Effect pipeline since payment is successfully verified
     const pipeline = analyzePhotoPipeline(data.base64Image)
