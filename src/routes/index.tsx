@@ -3,6 +3,7 @@ import { useState, useRef } from 'react'
 import { analyzeFaceFn } from '../functions/analyzeFace'
 import { createRazorpayOrderFn } from '../functions/razorpay'
 import { Upload, Activity, Crosshair, RefreshCcw, CheckCircle2, Lock, Loader2, Maximize2, X, Download } from 'lucide-react'
+import { ActorReferencesGrid } from '../components/ActorReferences'
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -498,6 +499,11 @@ function Home() {
                     )}
                   </div>
                 </section>
+
+                {/* Actor Reference Examples */}
+                {result.referenceExamples && result.referenceExamples.length > 0 && (
+                  <ActorReferencesGrid examples={result.referenceExamples} />
+                )}
 
               </div>
             )}
