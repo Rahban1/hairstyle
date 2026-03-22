@@ -87,16 +87,15 @@ function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
             <Link
               to="/analyze"
-              className="group relative inline-flex items-center gap-3 px-8 py-4 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
+              className="group inline-flex items-center gap-3 px-8 py-4 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
             >
-              <span className="relative z-10">Analyze My Face</span>
-              <ArrowRight size={16} className="relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-[var(--text-muted)] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
+              <span>Analyze My Face</span>
+              <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
             </Link>
             
             <button 
               onClick={scrollToFeatures}
-              className="inline-flex items-center gap-2 px-6 py-4 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors duration-300"
+              className="inline-flex items-center gap-2 px-6 py-4 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors duration-200"
             >
               How It Works
               <ChevronDown size={14} className="animate-bounce" />
@@ -135,7 +134,7 @@ function LandingPage() {
                 icon: Shield,
                 number: '02',
                 title: 'Secure Payment',
-                description: 'One-time fee of ₹89 (about $1 USD). We never store your photos. Your privacy matters.'
+                description: 'One-time fee of $1. Pay securely. We never store your photos.'
               },
               {
                 icon: Zap,
@@ -263,14 +262,14 @@ function LandingPage() {
           
           <Link
             to="/analyze"
-            className="group inline-flex items-center gap-4 px-10 py-5 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
+            className="group inline-flex items-center gap-4 px-10 py-5 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
           >
             <span>Start Analysis</span>
-            <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform duration-300" />
+            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
           </Link>
 
           <p className="mt-8 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]">
-            89 INR One-Time Payment
+            $1 One-Time Payment
           </p>
         </div>
       </section>

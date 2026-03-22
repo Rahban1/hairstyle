@@ -113,7 +113,7 @@ function AnalyzePage() {
       amount: paymentAmount.toString(),
       currency: paymentCurrency,
       name: 'Optimal Hair AI',
-      description: 'Objective Facial Assessment - $1 (₹89)',
+      description: 'Objective Facial Assessment - $1',
       image: 'https://cdn-icons-png.flaticon.com/512/10041/10041432.png',
       order_id: orderId,
       handler: function (response: any) {
@@ -328,7 +328,7 @@ function AnalyzePage() {
                   <header className="text-center border-b border-[var(--border-color)] pb-6 mb-4">
                     <Lock size={28} strokeWidth={1} className="mx-auto mb-4 text-[var(--text-main)]" />
                     <h2 className="text-2xl font-serif text-[var(--text-main)] mb-2">Almost there</h2>
-                    <p className="text-sm text-[var(--text-muted)]">One-time payment of ₹89 (about $1 USD) to get your personalized hairstyle analysis.</p>
+                    <p className="text-sm text-[var(--text-muted)]">One-time payment of $1 to get your personalized hairstyle analysis.</p>
                   </header>
 
                   {isInitializingPayment && (
@@ -354,7 +354,7 @@ function AnalyzePage() {
                         className="w-full clinical-button bg-[var(--text-main)] text-[var(--bg-base)] py-4 hover:opacity-80 transition-opacity flex items-center justify-center gap-3"
                       >
                         <Lock size={16} strokeWidth={1.5} />
-                        Pay ₹89 & Get Results
+                        Pay $1 & Get Results
                       </button>
                       <p className="text-center text-[10px] text-[var(--text-muted)] uppercase tracking-widest mt-4">
                         Secure checkout. Supports UPI, Cards, NetBanking.
