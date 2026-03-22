@@ -89,7 +89,7 @@ function LandingPage() {
               to="/analyze"
               className="group relative inline-flex items-center gap-3 px-8 py-4 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
             >
-              <span className="relative z-10">Find My Style — ₹89</span>
+              <span className="relative z-10">Analyze My Face</span>
               <ArrowRight size={16} className="relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
               <div className="absolute inset-0 bg-[var(--text-muted)] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
             </Link>
@@ -265,12 +265,12 @@ function LandingPage() {
             to="/analyze"
             className="group inline-flex items-center gap-4 px-10 py-5 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
           >
-            <span>Get My Analysis — ₹89</span>
+            <span>Start Analysis</span>
             <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform duration-300" />
           </Link>
 
           <p className="mt-8 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]">
-            Secure Payment • Instant Results • 30-Second Analysis
+            89 INR One-Time Payment
           </p>
         </div>
       </section>
