@@ -1,560 +1,356 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useRef } from 'react'
-import { analyzeFaceFn } from '../functions/analyzeFace'
-import { createRazorpayOrderFn } from '../functions/razorpay'
-import { Upload, Activity, Crosshair, RefreshCcw, CheckCircle2, Lock, Loader2, Maximize2, X, Download } from 'lucide-react'
-import { ActorReferencesGrid } from '../components/ActorReferences'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Sparkles, ArrowRight, Scan, Shield, Zap, ChevronDown } from 'lucide-react'
 
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
-}
+export const Route = createFileRoute('/')({ component: LandingPage })
 
-export const Route = createFileRoute('/')({ component: Home })
+function LandingPage() {
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
+  const heroRef = useRef<HTMLDivElement>(null)
 
-function Home() {
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [base64Image, setBase64Image] = useState<string | null>(null)
-  
-  // Payment State
-  const [isCheckout, setIsCheckout] = useState(false)
-  const [isInitializingPayment, setIsInitializingPayment] = useState(false)
-  const [paymentError, setPaymentError] = useState<string | null>(null)
-  const [orderId, setOrderId] = useState<string | null>(null)
-  const [paymentAmount, setPaymentAmount] = useState<number>(8900) 
-  const [paymentCurrency, setPaymentCurrency] = useState<string>('INR')
-  
-  // Analysis State
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [result, setResult] = useState<any>(null)
-  const [lastPaymentResponse, setLastPaymentResponse] = useState<any>(null)
-  
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleFile = async (file: File) => {
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64String = reader.result as string
-      setImagePreview(base64String)
-      setBase64Image(base64String)
-      setResult(null) 
-      setPaymentError(null)
-      setIsCheckout(true)
-      setIsInitializingPayment(true)
-
-      try {
-        const data = await createRazorpayOrderFn()
-        if (data.orderId) {
-          setOrderId(data.orderId)
-          setPaymentAmount(data.amount)
-          setPaymentCurrency(data.currency)
-        } else {
-          setPaymentError("Gateway failed to generate an Order ID.")
-        }
-      } catch (err: any) {
-        console.error("Failed to initialize payment:", err)
-        setPaymentError(err?.message || "Payment gateway unavailable. Please contact support.")
-      } finally {
-        setIsInitializingPayment(false)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect()
+        setMousePos({
+          x: (e.clientX - rect.left) / rect.width,
+          y: (e.clientY - rect.top) / rect.height,
+        })
       }
     }
-    reader.readAsDataURL(file)
-  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
-  }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
 
-  const handleDrop = (e: React.DragEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file && file.type.startsWith('image/')) {
-      handleFile(file)
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
-  const displayRazorpay = async () => {
-    const res = await loadRazorpayScript()
-
-    if (!res) {
-      alert('Razorpay SDK failed to load. Are you online?')
-      return
-    }
-
-    const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID, 
-      amount: paymentAmount.toString(),
-      currency: paymentCurrency,
-      name: 'Optimal Hair AI',
-      description: 'Objective Facial Assessment - $1 (₹89)',
-      image: 'https://cdn-icons-png.flaticon.com/512/10041/10041432.png',
-      order_id: orderId,
-      handler: function (response: any) {
-        // Only trigger analysis upon successful completion of payment
-        triggerAnalysis(response)
-      },
-      prefill: {
-        name: 'Guest User',
-        email: 'guest@example.com',
-      },
-      notes: {
-        address: 'Optimal Hair AI HQ',
-      },
-      theme: {
-        color: '#111111', 
-      },
-    }
-
-    const paymentObject = new (window as any).Razorpay(options)
-    paymentObject.on('payment.failed', function (response: any) {
-      alert(`Payment failed: ${response.error.description}`)
-    })
-    paymentObject.open()
-  }
-
-  const triggerAnalysis = async (paymentResponse: any) => {
-    if (!base64Image) return
-    setIsCheckout(false)
-    setIsAnalyzing(true)
-    setLastPaymentResponse(paymentResponse)
-    
-    try {
-      // Send the image ALONG WITH the cryptographically signed payment token
-      const data = await analyzeFaceFn({ 
-        data: { 
-          base64Image,
-          razorpay_payment_id: paymentResponse.razorpay_payment_id,
-          razorpay_order_id: paymentResponse.razorpay_order_id,
-          razorpay_signature: paymentResponse.razorpay_signature
-        } 
-      })
-      setResult(data)
-    } catch (err: any) {
-      console.error("Analysis or Payment Verification failed:", err)
-      alert(err.message || "Payment Verification Failed. Unauthorized Request.")
-      resetAssessment()
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const retryAnalysis = async () => {
-    if (!lastPaymentResponse) return
-    setIsAnalyzing(true)
-    
-    try {
-      const data = await analyzeFaceFn({ 
-        data: { 
-          base64Image,
-          razorpay_payment_id: lastPaymentResponse.razorpay_payment_id,
-          razorpay_order_id: lastPaymentResponse.razorpay_order_id,
-          razorpay_signature: lastPaymentResponse.razorpay_signature
-        } 
-      })
-      setResult(data)
-    } catch (err: any) {
-      console.error("Retry failed:", err)
-      alert(err.message || "Analysis failed. Please try again from the beginning.")
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const resetAssessment = () => {
-    setImagePreview(null)
-    setBase64Image(null)
-    setResult(null)
-    setIsCheckout(false)
-    setOrderId(null)
-    setPaymentError(null)
-    setIsFullscreen(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const handleDownload = async (url: string) => {
-    try {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      const blobUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = `optimal-hair-ai-${Date.now()}.jpg`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(blobUrl)
-    } catch (err) {
-      console.error("Download failed, opening in new tab instead", err)
-      window.open(url, '_blank')
-    }
+  const scrollToFeatures = () => {
+    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   return (
-    <main className="page-wrap px-4 py-16 md:py-24 min-h-screen max-w-5xl mx-auto flex flex-col items-center selection:bg-[var(--text-main)] selection:text-[var(--bg-base)]">
-      
-      {/* HEADER SECTION */}
-      <header className="text-center mb-16 max-w-3xl fade-in">
-        <h1 className="text-4xl md:text-5xl lg:text-6xl mb-6 tracking-tight text-[var(--text-main)]">
-          Objective Facial Assessment
-        </h1>
-        <p className="text-sm md:text-base text-[var(--text-muted)] leading-relaxed font-sans max-w-xl mx-auto">
-          Discard generic face shape charts. Our algorithmic system evaluates your unique facial thirds, symmetrical deviations, and structural proportions to synthesize the mathematically optimal hairstyle.
-        </p>
-      </header>
+    <main className="relative overflow-hidden bg-[var(--bg-base)]">
+      {/* Animated Background Grid */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `
+              linear-gradient(var(--text-main) 1px, transparent 1px),
+              linear-gradient(90deg, var(--text-main) 1px, transparent 1px)
+            `,
+            backgroundSize: '60px 60px',
+            transform: `translate(${(mousePos.x - 0.5) * -10}px, ${(mousePos.y - 0.5) * -10}px)`,
+            transition: 'transform 0.3s ease-out',
+          }}
+        />
+      </div>
 
-      {/* HIDDEN INPUT */}
-      <input 
-        type="file"
-        accept="image/*"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        className="hidden"
-        aria-hidden="true"
-        tabIndex={-1}
-      />
-
-      {/* UPLOAD STATE */}
-      {!imagePreview && (
-        <button 
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          aria-label="Upload portrait for facial analysis"
-          className={`w-full max-w-2xl border p-10 sm:p-16 md:p-24 text-center transition-all duration-300 ease-out cursor-pointer group fade-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--bg-base)] ${
-            isDragging 
-              ? 'border-solid border-[var(--text-main)] bg-[var(--surface)] scale-[1.02]' 
-              : 'border-dashed border-[var(--border-color)] clinical-bg hover:border-[var(--text-main)] hover:shadow-sm'
-          }`}
-        >
-          <div className="flex flex-col items-center justify-center gap-5">
-            <div className="p-4 rounded-full bg-[var(--bg-base)] border border-[var(--border-color)] group-hover:scale-110 transition-transform duration-300 ease-out shadow-sm">
-              <Upload size={24} strokeWidth={1.5} className="text-[var(--text-main)]" />
-            </div>
-            <div>
-              <span className="label-caps block mb-2 text-[var(--text-main)] group-hover:text-black dark:group-hover:text-white transition-colors">
-                {isDragging ? 'Drop Image Here' : 'Submit Portrait'}
-              </span>
-              <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">
-                Drag and drop, or click to browse. Ensure the face is clearly visible with neutral lighting.
-              </p>
-            </div>
-          </div>
-        </button>
-      )}
-
-      {/* ANALYSIS STATE */}
-      {imagePreview && (
-        <div className="w-full fade-in grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start mt-4">
-          
-          {/* LEFT: IMAGE SUBJECT */}
-          <div className="flex flex-col gap-4 sm:gap-6 lg:sticky lg:top-24">
-            <div className="w-full clinical-border p-2 bg-[var(--surface)] relative group">
-              <div className="relative overflow-hidden w-full bg-black/5 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
-                <img 
-                  src={imagePreview} 
-                  alt="Portrait subject awaiting analysis" 
-                  className={`w-full max-h-[50vh] lg:max-h-[70vh] object-contain grayscale-[20%] contrast-125 transition-transform duration-700 ease-out ${isCheckout ? 'blur-sm scale-105' : ''}`}
-                />
-                
-                {/* CHECKOUT OVERLAY (BLUR) */}
-                {isCheckout && (
-                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center text-white z-10 transition-all duration-500 ease-in-out">
-                    <Lock size={48} strokeWidth={1} className="opacity-70" />
-                  </div>
-                )}
-
-                {/* SCANNING OVERLAY */}
-                {isAnalyzing && (
-                  <div className="absolute inset-0 bg-[var(--bg-base)]/80 backdrop-blur-sm flex flex-col items-center justify-center border border-[var(--border-color)] m-2 z-10 transition-all duration-500 ease-in-out">
-                    <Activity className="animate-pulse mb-6 text-[var(--text-main)]" size={32} strokeWidth={1.5} />
-                    <span className="label-caps tracking-[0.2em] text-[var(--text-main)] animate-pulse">
-                      Analyzing Proportions
-                    </span>
-                    <div className="mt-8 w-48 h-px bg-[var(--border-color)] overflow-hidden relative">
-                      <div className="absolute top-0 left-0 h-full bg-[var(--text-main)] w-1/3 animate-[pulse_1.5s_ease-in-out_infinite]" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <button 
-              type="button"
-              disabled={isAnalyzing}
-              onClick={resetAssessment}
-              className="group flex items-center justify-center gap-3 label-caps text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all duration-300 text-center w-full py-4 clinical-border clinical-bg hover:bg-transparent disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)]"
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-6 md:px-12 py-6">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link to="/" className="text-lg tracking-[0.2em] uppercase font-serif text-[var(--text-main)]">
+            Optimal Hair
+          </Link>
+          <div className="hidden md:flex items-center gap-8 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)]">
+            <a href="#features" className="hover:text-[var(--text-main)] transition-colors duration-300">Features</a>
+            <a href="#method" className="hover:text-[var(--text-main)] transition-colors duration-300">Method</a>
+            <Link 
+              to="/analyze" 
+              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--text-main)] text-[var(--bg-base)] hover:opacity-80 transition-opacity duration-300"
             >
-              <RefreshCcw size={14} className="group-hover:-rotate-90 transition-transform duration-500" strokeWidth={1.5} />
-              Reset Assessment
+              Start Analysis
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section 
+        ref={heroRef}
+        className="relative min-h-screen flex flex-col items-center justify-center px-6 md:px-12 pt-24"
+      >
+        {/* Decorative Elements */}
+        <div className="absolute top-1/4 left-8 md:left-16 w-px h-32 bg-gradient-to-b from-transparent via-[var(--border-color)] to-transparent opacity-50" />
+        <div className="absolute bottom-1/4 right-8 md:right-16 w-px h-32 bg-gradient-to-b from-transparent via-[var(--border-color)] to-transparent opacity-50" />
+        
+        {/* Floating Badge */}
+        <div className="absolute top-32 right-8 md:right-24 animate-float hidden lg:block">
+          <div className="flex items-center gap-2 px-4 py-2 border border-[var(--border-color)] bg-[var(--bg-base)]/80 backdrop-blur-sm">
+            <Sparkles size={14} className="text-[var(--text-main)]" />
+            <span className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">AI Powered</span>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="relative z-10 max-w-5xl mx-auto text-center">
+          {/* Overline */}
+          <div className="inline-flex items-center gap-3 mb-8 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s', animationFillMode: 'forwards' }}>
+            <div className="w-12 h-px bg-[var(--text-main)]" />
+            <span className="text-[11px] tracking-[0.3em] uppercase text-[var(--text-muted)]">Facial Geometry Analysis</span>
+            <div className="w-12 h-px bg-[var(--text-main)]" />
+          </div>
+
+          {/* Headline */}
+           <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl leading-[0.9] tracking-tight mb-8 text-[var(--text-main)] opacity-0 animate-fade-in-up text-balance" style={{ animationDelay: '0.4s', animationFillMode: 'forwards' }}>
+             <span className="block">Stop Guessing</span>
+             <span className="block italic text-[var(--text-muted)]">Start Knowing</span>
+             <span className="block">Your Best Hair</span>
+           </h1>
+
+          {/* Subhead */}
+          <p className="max-w-xl mx-auto text-sm md:text-base text-[var(--text-muted)] leading-relaxed mb-12 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.6s', animationFillMode: 'forwards' }}>
+            Upload a photo. Our AI analyzes 4 key facial markers — your proportions, symmetry, face length, and jaw structure. Get a personalized style recommendation based on what actually works for your face. Not generic face shape charts.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
+            <Link
+              to="/analyze"
+              className="group relative inline-flex items-center gap-3 px-8 py-4 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
+            >
+              <span className="relative z-10">Find My Style — ₹89</span>
+              <ArrowRight size={16} className="relative z-10 group-hover:translate-x-1 transition-transform duration-300" />
+              <div className="absolute inset-0 bg-[var(--text-muted)] transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
+            </Link>
+            
+            <button 
+              onClick={scrollToFeatures}
+              className="inline-flex items-center gap-2 px-6 py-4 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors duration-300"
+            >
+              How It Works
+              <ChevronDown size={14} className="animate-bounce" />
             </button>
           </div>
+        </div>
 
-          {/* RIGHT: DATA & RESULTS */}
-          <div className="flex flex-col h-full w-full gap-6 md:gap-8 mt-2 lg:mt-0">
-            
-            {/* CHECKOUT STATE */}
-            {isCheckout && (
-              <div className="fade-in flex flex-col items-center justify-center clinical-border bg-[var(--surface)]/50 p-6 sm:p-8 min-h-[300px] md:min-h-[400px] h-full">
-                <div className="w-full max-w-sm flex flex-col gap-6">
-                  <header className="text-center border-b border-[var(--border-color)] pb-6 mb-4">
-                    <Lock size={28} strokeWidth={1} className="mx-auto mb-4 text-[var(--text-main)]" />
-                    <h2 className="text-2xl font-serif text-[var(--text-main)] mb-2">Unlock Assessment</h2>
-                    <p className="text-sm text-[var(--text-muted)]">A ₹89 INR charge (≈$1.00 USD) is required to initialize the computational algorithms.</p>
-                  </header>
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '1.2s', animationFillMode: 'forwards' }}>
+          <span className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">Scroll</span>
+          <div className="w-px h-12 bg-gradient-to-b from-[var(--text-muted)] to-transparent" />
+        </div>
+      </section>
 
-                  {isInitializingPayment && (
-                    <div className="py-12 flex flex-col items-center justify-center gap-4">
-                      <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
-                      <span className="label-caps opacity-60">Connecting to Gateway...</span>
-                    </div>
-                  )}
+      {/* Features Section */}
+      <section id="features" className="relative py-32 md:py-48 px-6 md:px-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Section Header */}
+          <div className="mb-20 md:mb-32">
+            <span className="text-[11px] tracking-[0.3em] uppercase text-[var(--text-muted)] block mb-4">How It Works</span>
+           <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl text-[var(--text-main)] max-w-3xl text-pretty">
+               Your personalized analysis in <span className="italic">3 simple steps</span>
+             </h2>
+          </div>
 
-                  {!isInitializingPayment && paymentError && (
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="p-4 border border-[var(--error)] bg-[var(--error)]/10 text-[var(--error)] text-xs rounded-none text-center leading-relaxed font-medium">
-                        <p className="font-bold uppercase tracking-wider mb-2 text-[10px]">Payment System Offline</p>
-                        <p>{paymentError}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isInitializingPayment && !paymentError && orderId && (
-                    <div className="fade-in">
-                      <button 
-                        onClick={displayRazorpay}
-                        className="w-full clinical-button bg-[var(--text-main)] text-[var(--bg-base)] py-4 hover:opacity-80 transition-opacity flex items-center justify-center gap-3"
-                      >
-                        <Lock size={16} strokeWidth={1.5} />
-                        Pay with Razorpay (₹89)
-                      </button>
-                      <p className="text-center text-[10px] text-[var(--text-muted)] uppercase tracking-widest mt-4">
-                        100% Secure Checkout. Supports UPI, Cards, NetBanking.
-                      </p>
-                    </div>
-                  )}
+          {/* Feature Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--border-color)]">
+            {[
+              {
+                icon: Scan,
+                number: '01',
+                title: 'Snap & Upload',
+                description: 'Take a clear front-facing photo. Neutral lighting works best — just like a passport photo.'
+              },
+              {
+                icon: Shield,
+                number: '02',
+                title: 'Secure Payment',
+                description: 'One-time fee of ₹89 (about $1 USD). We never store your photos. Your privacy matters.'
+              },
+              {
+                icon: Zap,
+                number: '03',
+                title: 'Get Your Report',
+                description: 'Receive your personalized hairstyle recommendation with celebrity examples you can show your barber.'
+              }
+            ].map((feature, idx) => (
+              <div 
+                key={idx}
+                className="group relative bg-[var(--bg-base)] p-8 md:p-12 transition-[background-color] duration-500 hover:bg-[var(--surface)]"
+              >
+                {/* Number */}
+                <span className="absolute top-8 right-8 text-6xl font-serif text-[var(--border-color)] group-hover:text-[var(--text-muted)] transition-colors duration-500">
+                  {feature.number}
+                </span>
+                
+                {/* Icon */}
+                <div className="mb-8">
+                  <feature.icon size={28} strokeWidth={1} className="text-[var(--text-main)]" />
                 </div>
-              </div>
-            )}
 
-            {/* ANALYZING STATE */}
-            {isAnalyzing && (
-              <div className="h-full min-h-[400px] clinical-border p-8 flex flex-col gap-10 justify-center bg-[var(--surface)]/30">
+                {/* Content */}
+                <h3 className="font-serif text-xl md:text-2xl mb-4 text-[var(--text-main)]">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+                  {feature.description}
+                </p>
+
+                {/* Hover Line */}
+                <div className="absolute bottom-0 left-0 w-0 h-px bg-[var(--text-main)] group-hover:w-full transition-[width] duration-500" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Method Section */}
+      <section id="method" className="relative py-32 md:py-48 px-6 md:px-12 bg-[var(--surface)]">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 md:gap-24 items-center">
+            {/* Left Content */}
+            <div>
+              <span className="text-[11px] tracking-[0.3em] uppercase text-[var(--text-muted)] block mb-4">The Science</span>
+           <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl text-[var(--text-main)] mb-8 text-pretty">
+                 Why generic advice <span className="italic">lets you down</span>
+               </h2>
+              <div className="space-y-6 text-[var(--text-muted)] leading-relaxed">
+                <p>
+                  You've seen the charts — "oval faces should try this, square faces should try that." But your face is more than a shape. It's a unique combination of proportions that no category can capture.
+                </p>
+                <p>
+                  We analyze four measurements that actually matter: the balance between your forehead, nose, and chin; how symmetrical your features are; whether your face is longer or wider; and the angle of your jawline. These four factors determine which styles will enhance your natural structure and which will fight against it.
+                </p>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-8 mt-12 pt-12 border-t border-[var(--border-color)]">
                 {[
-                  'Extracting facial thirds', 
-                  'Mapping symmetrical variance', 
-                  'Measuring vertical orientation', 
-                  'Calculating jaw projection',
-                  'Cryptographic payment verified'
-                ].map((step, idx) => (
-                  <div key={idx} className="w-full relative">
-                    <div className="flex justify-between items-end mb-3">
-                      <span className="text-xs uppercase tracking-wider text-[var(--text-main)] font-medium opacity-80">{step}</span>
-                      <span className="text-[10px] text-[var(--text-muted)] font-mono animate-pulse">
-                        {idx === 4 ? "Verified" : "Processing"}
-                      </span>
+                  { value: '4', label: 'Key Measurements' },
+                  { value: '<1s', label: 'Analysis Time' },
+                  { value: '100%', label: 'Personalized' }
+                ].map((stat, idx) => (
+                  <div key={idx}>
+                    <div className="font-serif text-3xl md:text-4xl text-[var(--text-main)] mb-2">
+                      {stat.value}
                     </div>
-                    <div className="h-px w-full bg-[var(--border-color)] overflow-hidden relative">
-                       <div 
-                         className="absolute top-0 left-0 h-full bg-[var(--text-main)] transition-all duration-[2000ms] ease-out" 
-                         style={{ 
-                           width: idx === 4 ? '100%' : '100%', 
-                           transformOrigin: 'left',
-                           animation: idx === 4 ? 'none' : `scaleX 2s ease-out infinite alternate`,
-                           animationDelay: `${idx * 0.2}s`
-                         }}
-                       />
+                    <div className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">
+                      {stat.label}
                     </div>
                   </div>
                 ))}
               </div>
-            )}
+            </div>
 
-            {/* RESULT STATE */}
-            {result && !isAnalyzing && !isCheckout && (
-              <div className="fade-in flex flex-col gap-8">
-                {/* Protocol section */}
-                <section className="clinical-border bg-[var(--bg-base)] overflow-hidden group">
-                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex items-center gap-3">
-                    <CheckCircle2 size={16} strokeWidth={1.5} className="text-[var(--text-main)]" />
-                    <span className="label-caps text-[var(--text-main)]">Aesthetic Protocol</span>
-                  </div>
-                  <div className="p-6 md:p-8 lg:p-10 transition-colors duration-500 hover:bg-[var(--surface)]/50">
-                    <h2 className="text-xl sm:text-2xl lg:text-3xl mb-4 sm:mb-5 leading-snug font-serif text-[var(--text-main)]">
-                      {result.recommendation}
-                    </h2>
-                    <p className="text-sm md:text-base text-[var(--text-muted)] leading-relaxed">
-                      {result.explanation}
+            {/* Right Visual */}
+            <div className="relative">
+              <div className="aspect-[4/5] bg-[var(--bg-base)] border border-[var(--border-color)] relative overflow-hidden">
+                {/* Geometric Overlay */}
+                <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 400 500">
+                  <line x1="200" y1="0" x2="200" y2="500" stroke="var(--text-main)" strokeWidth="1" />
+                  <line x1="0" y1="166" x2="400" y2="166" stroke="var(--text-main)" strokeWidth="1" />
+                  <line x1="0" y1="333" x2="400" y2="333" stroke="var(--text-main)" strokeWidth="1" />
+                  <ellipse cx="200" cy="250" rx="150" ry="200" fill="none" stroke="var(--text-main)" strokeWidth="1" />
+                </svg>
+                
+                {/* Content */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-24 h-24 mx-auto mb-6 rounded-full border border-[var(--border-color)] flex items-center justify-center">
+                      <Scan size={32} strokeWidth={1} className="text-[var(--text-main)]" />
+                    </div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)] max-w-xs mx-auto">
+                      Facial geometry visualization
                     </p>
                   </div>
-                </section>
-
-                {/* Metrics Table */}
-                <section className="clinical-border bg-[var(--bg-base)]">
-                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg">
-                    <span className="label-caps">Geometric Markers</span>
-                  </div>
-                  <div className="px-4 sm:px-6 md:px-8 py-2">
-                    <div className="metric-row group">
-                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Upper Third</span>
-                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
-                        {result.analysis.upperThird.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="metric-row group">
-                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Symmetry</span>
-                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
-                        {result.analysis.symmetry}
-                      </span>
-                    </div>
-                    <div className="metric-row group">
-                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Vertical Axis</span>
-                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
-                        {result.analysis.verticalLength}
-                      </span>
-                    </div>
-                    <div className="metric-row group border-b-0">
-                      <span className="text-[10px] sm:text-xs uppercase tracking-widest text-[var(--text-muted)] transition-colors group-hover:text-[var(--text-main)]">Jaw Structure</span>
-                      <span className="font-serif text-[var(--text-main)] capitalize text-right text-sm sm:text-base">
-                        {result.analysis.jawProjection.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Simulated Output */}
-                <section className="clinical-border flex flex-col bg-[var(--bg-base)]">
-                  <div className="p-4 border-b border-[var(--border-color)] clinical-bg flex justify-between items-center">
-                    <span className="label-caps">Simulated Outcome</span>
-                    {result.generatedImageUrl && (
-                      <span className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--text-muted)]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                        Generated
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-6 md:p-8 text-center bg-[var(--surface)]/30">
-                    {result.generatedImageUrl ? (
-                      <div 
-                        onClick={() => setIsFullscreen(true)}
-                        className="overflow-hidden clinical-border bg-[var(--surface)] relative group cursor-pointer"
-                      >
-                        <img 
-                          src={result.generatedImageUrl} 
-                          alt="AI simulated outcome" 
-                          className="w-full h-auto grayscale-[10%] group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-700 ease-out"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-500 ease-out flex items-center justify-center">
-                          <div className="opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-500 ease-out flex items-center gap-2 bg-white text-black px-4 py-2 rounded-sm text-xs uppercase tracking-widest font-semibold">
-                            <Maximize2 size={14} /> View Protocol
-                          </div>
-                        </div>
-                      </div>
-                    ) : result.generatedImageError ? (
-                      <div className="py-12 flex flex-col items-center gap-4">
-                        <div className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border-color)]">
-                          <Crosshair size={20} strokeWidth={1.5} className="text-[var(--text-muted)] opacity-60" />
-                        </div>
-                        <p className="text-[10px] md:text-xs uppercase tracking-widest text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed">
-                          {result.generatedImageError}
-                        </p>
-                        <button 
-                          onClick={retryAnalysis}
-                          disabled={isAnalyzing}
-                          className="mt-2 flex items-center gap-2 text-[10px] uppercase tracking-widest text-[var(--text-main)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
-                        >
-                          <RefreshCcw size={12} className={isAnalyzing ? 'animate-spin' : ''} />
-                          {isAnalyzing ? 'Retrying...' : 'Try Again'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="py-12 flex flex-col items-center gap-4">
-                        <div className="p-3 rounded-full bg-[var(--surface)] border border-[var(--border-color)]">
-                          <Crosshair size={20} strokeWidth={1.5} className="text-[var(--text-muted)] opacity-60" />
-                        </div>
-                        <p className="text-[10px] md:text-xs uppercase tracking-widest text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed">
-                          Premium diffusion rendering requires active API connection. Add your configuration to generate the final simulation.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Actor Reference Examples */}
-                {result.referenceExamples && result.referenceExamples.length > 0 && (
-                  <ActorReferencesGrid examples={result.referenceExamples} />
-                )}
-
+                </div>
               </div>
-            )}
+
+              {/* Floating Element */}
+              <div className="absolute -bottom-6 -left-6 bg-[var(--text-main)] text-[var(--bg-base)] p-6 max-w-xs">
+                <p className="text-xs leading-relaxed">
+                  "Finally, advice that actually makes sense for my face. Showed the results to my barber and got the best haircut of my life."
+                </p>
+                <p className="text-[10px] tracking-[0.15em] uppercase mt-4 opacity-60">
+                  — Rahul, Bangalore
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* FULLSCREEN IMAGE MODAL */}
-      {isFullscreen && result?.generatedImageUrl && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 fade-in cursor-default"
-          onClick={() => setIsFullscreen(false)}
-        >
-          {/* Top Actions */}
-          <div className="absolute top-0 right-0 w-full p-6 flex justify-end gap-4 z-50">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation()
-                handleDownload(result.generatedImageUrl)
-              }}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-sm transition-colors text-xs uppercase tracking-widest font-medium border border-white/20"
-            >
-              <Download size={16} /> Save Image
-            </button>
-            <button 
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsFullscreen(false)
-              }}
-              className="flex items-center justify-center bg-white/10 hover:bg-white/20 text-white w-10 h-10 rounded-sm transition-colors border border-white/20"
-              aria-label="Close Fullscreen"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Expanded Image */}
-          <div className="relative max-w-5xl max-h-[85vh] w-full flex items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
-            <img 
-              src={result.generatedImageUrl} 
-              alt="Expanded Simulated Outcome" 
-              className="w-auto h-auto max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm ring-1 ring-white/10"
-            />
-          </div>
+      {/* CTA Section */}
+      <section className="relative py-32 md:py-48 px-6 md:px-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <span className="text-[11px] tracking-[0.3em] uppercase text-[var(--text-muted)] block mb-6">Ready to see your best look?</span>
+           <h2 className="font-serif text-4xl md:text-5xl lg:text-7xl text-[var(--text-main)] mb-8 text-balance">
+             One photo. One dollar. <span className="italic">Zero regret</span>
+           </h2>
+          <p className="text-[var(--text-muted)] mb-12 max-w-lg mx-auto">
+            Think about how much you've spent on haircuts that didn't work. For less than the cost of a coffee, get a recommendation you can use for years.
+          </p>
           
-          <p className="absolute bottom-8 text-white/50 text-xs uppercase tracking-[0.2em] font-medium animate-pulse">
-            Optimal Hair Protocol Generated
+          <Link
+            to="/analyze"
+            className="group inline-flex items-center gap-4 px-10 py-5 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium overflow-hidden transition-[transform,box-shadow] duration-500 hover:shadow-2xl"
+          >
+            <span>Get My Analysis — ₹89</span>
+            <ArrowRight size={16} className="group-hover:translate-x-2 transition-transform duration-300" />
+          </Link>
+
+          <p className="mt-8 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]">
+            Secure Payment • Instant Results • 30-Second Analysis
           </p>
         </div>
-      )}
+      </section>
 
+      {/* Footer */}
+      <footer className="relative py-12 px-6 md:px-12 border-t border-[var(--border-color)]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-[var(--text-muted)] text-xs tracking-[0.15em] uppercase">
+            © 2024 Optimal Hair AI
+          </div>
+          <div className="flex items-center gap-8 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]">
+            <Link to="/about" className="hover:text-[var(--text-main)] transition-colors">Methodology</Link>
+            <Link to="/analyze" className="hover:text-[var(--text-main)] transition-colors">Assessment</Link>
+          </div>
+        </div>
+      </footer>
+
+      {/* Custom Styles */}
+      <style>{`
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+        
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
+        }
+      `}</style>
     </main>
   )
 }

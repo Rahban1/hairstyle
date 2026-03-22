@@ -65,7 +65,7 @@ export default function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
         ) : (
           <Lock size={16} strokeWidth={1.5} />
         )}
-        <span>{isLoading ? "Processing..." : "Pay $1.00"}</span>
+        <span>{isLoading ? "Processing…" : "Pay $1.00"}</span>
       </button>
 
       <p className="text-center text-[10px] text-[var(--text-muted)] uppercase tracking-widest mt-2">

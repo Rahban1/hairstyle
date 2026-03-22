@@ -66,7 +66,7 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleMode}
-      className="text-xs uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors focus:outline-none"
+      className="text-xs uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-main)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-base)] rounded-sm px-2 py-1"
     >
       {mode === 'auto' ? 'AUTO' : mode === 'dark' ? 'DARK' : 'LIGHT'}
     </button>

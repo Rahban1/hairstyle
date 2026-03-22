@@ -21,6 +21,13 @@ export default function Header() {
             className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
             activeProps={{ className: 'text-[var(--text-main)]' }}
           >
+            Home
+          </Link>
+          <Link
+            to="/analyze"
+            className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+            activeProps={{ className: 'text-[var(--text-main)]' }}
+          >
             Assessment
           </Link>
           <Link

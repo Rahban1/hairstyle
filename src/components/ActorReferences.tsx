@@ -54,6 +54,8 @@ export function ActorReferenceCard({ example }: ActorReferenceCardProps) {
           src={example.imageUrl}
           alt={`${example.name} - ${example.description}`}
           className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          width="300"
+          height="400"
           onError={() => setImageError(true)}
           onLoad={() => setIsLoading(false)}
           loading="lazy"
