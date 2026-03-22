@@ -87,10 +87,10 @@ function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
             <Link
               to="/analyze"
-              className="group inline-flex items-center gap-3 px-8 py-4 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
+              className="group inline-flex items-center gap-3 px-8 py-4 bg-black text-white dark:bg-white dark:text-black text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
             >
-              <span>Analyze My Face</span>
-              <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
+              <span className="text-white dark:text-black">Analyze My Face</span>
+              <ArrowRight size={16} className="text-white dark:text-black group-hover:translate-x-0.5 transition-transform duration-200" />
             </Link>
             
             <button 
@@ -103,11 +103,6 @@ function LandingPage() {
           </div>
         </div>
 
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 opacity-0 animate-fade-in" style={{ animationDelay: '1.2s', animationFillMode: 'forwards' }}>
-          <span className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">Scroll</span>
-          <div className="w-px h-12 bg-gradient-to-b from-[var(--text-muted)] to-transparent" />
-        </div>
       </section>
 
       {/* Features Section */}
@@ -262,10 +257,10 @@ function LandingPage() {
           
           <Link
             to="/analyze"
-            className="group inline-flex items-center gap-4 px-10 py-5 bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
+            className="group inline-flex items-center gap-4 px-10 py-5 bg-black text-white dark:bg-white dark:text-black text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
           >
-            <span>Start Analysis</span>
-            <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
+            <span className="text-white dark:text-black">Start Analysis</span>
+            <ArrowRight size={16} className="text-white dark:text-black group-hover:translate-x-0.5 transition-transform duration-200" />
           </Link>
 
           <p className="mt-8 text-[10px] tracking-[0.15em] uppercase text-[var(--text-muted)]">
