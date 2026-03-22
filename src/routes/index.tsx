@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
-import { Sparkles, ArrowRight, Scan, Shield, Zap, ChevronDown } from 'lucide-react'
+import { ArrowRight, Scan, Shield, Zap, ChevronDown } from 'lucide-react'
 
 export const Route = createFileRoute('/')({ component: LandingPage })
 
@@ -54,14 +54,6 @@ function LandingPage() {
         <div className="absolute top-1/4 left-8 md:left-16 w-px h-32 bg-gradient-to-b from-transparent via-[var(--border-color)] to-transparent opacity-50" />
         <div className="absolute bottom-1/4 right-8 md:right-16 w-px h-32 bg-gradient-to-b from-transparent via-[var(--border-color)] to-transparent opacity-50" />
         
-        {/* Floating Badge */}
-        <div className="absolute top-32 right-8 md:right-24 animate-float hidden lg:block">
-          <div className="flex items-center gap-2 px-4 py-2 border border-[var(--border-color)] bg-[var(--bg-base)]/80 backdrop-blur-sm">
-            <Sparkles size={14} className="text-[var(--text-main)]" />
-            <span className="text-[10px] tracking-[0.2em] uppercase text-[var(--text-muted)]">AI Powered</span>
-          </div>
-        </div>
-
         {/* Main Content */}
         <div className="relative z-10 max-w-5xl mx-auto text-center">
           {/* Overline */}
