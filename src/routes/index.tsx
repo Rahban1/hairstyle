@@ -87,7 +87,7 @@ function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 opacity-0 animate-fade-in-up" style={{ animationDelay: '0.8s', animationFillMode: 'forwards' }}>
             <Link
               to="/analyze"
-              className="group inline-flex items-center gap-3 px-8 py-4 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
+              className="group inline-flex items-center gap-3 px-8 py-4 bg-black text-white text-xs tracking-[0.2em] uppercase font-medium hover:bg-neutral-800 transition-colors duration-200 border border-black"
             >
               <span>Analyze My Face</span>
               <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
@@ -95,7 +95,7 @@ function LandingPage() {
             
             <button 
               onClick={scrollToFeatures}
-              className="inline-flex items-center gap-2 px-6 py-4 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors duration-200"
+              className="inline-flex items-center gap-2 px-6 py-4 text-xs tracking-[0.15em] uppercase text-neutral-500 hover:text-black transition-colors duration-200"
             >
               How It Works
               <ChevronDown size={14} className="animate-bounce" />
@@ -262,7 +262,7 @@ function LandingPage() {
           
           <Link
             to="/analyze"
-            className="group inline-flex items-center gap-4 px-10 py-5 bg-[var(--text-main)] text-[var(--bg-base)] text-xs tracking-[0.2em] uppercase font-medium hover:opacity-90 transition-opacity duration-200"
+            className="group inline-flex items-center gap-4 px-10 py-5 bg-black text-white text-xs tracking-[0.2em] uppercase font-medium hover:bg-neutral-800 transition-colors duration-200 border border-black"
           >
             <span>Start Analysis</span>
             <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform duration-200" />
