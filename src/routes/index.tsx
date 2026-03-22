@@ -45,26 +45,6 @@ function LandingPage() {
         />
       </div>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 md:px-12 py-6">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link to="/" className="text-lg tracking-[0.2em] uppercase font-serif text-[var(--text-main)]">
-            Optimal Hair
-          </Link>
-          <div className="hidden md:flex items-center gap-8 text-xs tracking-[0.15em] uppercase text-[var(--text-muted)]">
-            <a href="#features" className="hover:text-[var(--text-main)] transition-colors duration-300">Features</a>
-            <a href="#method" className="hover:text-[var(--text-main)] transition-colors duration-300">Method</a>
-            <Link 
-              to="/analyze" 
-              className="flex items-center gap-2 px-5 py-2.5 bg-[var(--text-main)] text-[var(--bg-base)] hover:opacity-80 transition-opacity duration-300"
-            >
-              Start Analysis
-              <ArrowRight size={14} />
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section 
         ref={heroRef}
